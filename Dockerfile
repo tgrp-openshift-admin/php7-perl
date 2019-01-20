@@ -1,2 +1,2 @@
-FROM centos:7
+FROM registry.access.redhat.com/rhel7-minimal
 RUN yum install -y httpd
