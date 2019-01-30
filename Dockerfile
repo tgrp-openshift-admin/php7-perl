@@ -72,7 +72,7 @@ COPY ./s2i/bin/ $STI_SCRIPTS_PATH
 COPY ./root/ /
 
 # Reset permissions of filesystem to default values
-# RUN /usr/libexec/container-setup && rpm-file-permissions
+RUN /usr/libexec/container-setup && rpm-file-permissions
 
 USER 1001
 
