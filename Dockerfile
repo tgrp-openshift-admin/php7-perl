@@ -14,6 +14,8 @@ EXPOSE 8443
 ENV PHP_VERSION=7.1 \
     PHP_VER_SHORT=71 \
     NAME=php \
+    PERL_VERSION=5.26 \
+    PERL_SHORT_VER=526 \
     PATH=$PATH:/opt/rh/rh-php71/root/usr/bin
 
 ENV SUMMARY="Platform for building and running PHP $PHP_VERSION applications" \
@@ -46,7 +48,37 @@ RUN yum install -y yum-utils && \
     INSTALL_PKGS="rh-php71 rh-php71-php rh-php71-php-mysqlnd rh-php71-php-pgsql rh-php71-php-bcmath \
                   rh-php71-php-gd rh-php71-php-intl rh-php71-php-ldap rh-php71-php-mbstring rh-php71-php-pdo \
                   rh-php71-php-process rh-php71-php-soap rh-php71-php-opcache rh-php71-php-xml \
-                  rh-php71-php-gmp rh-php71-php-pecl-apcu httpd24-mod_ssl" && \
+                  rh-php71-php-gmp rh-php71-php-pecl-apcu httpd24-mod_ssl \
+                  rh-perl526 rh-perl526-perl rh-perl526-perl-devel rh-perl526-mod_perl rh-perl526-perl-Apache-Reload rh-perl526-perl-CPAN rh-perl526-perl-App-cpanminus" && \
+    yum install -y --setopt=tsflags=nodocs  $INSTALL_PKGS && \
+    rpm -V $INSTALL_PKGS && \
+    yum clean all
+
+# Copy the S2I scripts from the specific language image to $STI_SCRIPTS_PATH
+COPY ./s2i/bin/ $STI_SCRIPTS_PATH
+
+# Copy extra files to the image.
+COPY ./root/ /
+
+# In order to drop the root user, we have to make some directories world
+# writeable as OpenShift default security model is to run the container under
+# random UID.
+RUN mkdir -p ${APP_ROOT}/etc/httpd.d && \
+    sed -i -f ${APP_ROOT}/etc/httpdconf.sed /opt/rh/httpd24/root/etc/httpd/conf/httpd.conf  && \
+    chmod -R og+rwx /opt/rh/httpd24/root/var/run/httpd ${APP_ROOT}/etc/httpd.d && \
+    chown -R 1001:0 ${APP_ROOT} && chmod -R ug+rwx ${APP_ROOT} && \
+    rpm-file-permissions
+
+USER 1001
+
+# Enable the SCL for all bash scripts.
+ENV BASH_ENV=${APP_ROOT}/etc/scl_enable \
+    ENV=${APP_ROOT}/etc/scl_enable \
+    PROMPT_COMMAND=". ${APP_ROOT}/etc/scl_enable"
+
+# Set the default CMD to print the usage of the language image
+CMD $STI_SCRIPTS_PATH/usage
+
     yum install -y --setopt=tsflags=nodocs $INSTALL_PKGS && \
     rpm -V $INSTALL_PKGS && \
     yum clean all -y
@@ -72,6 +104,7 @@ COPY ./s2i/bin/ $STI_SCRIPTS_PATH
 COPY ./root/ /
 
 # Reset permissions of filesystem to default values
+RUN chmod +x /usr/libexec/container-setup && chmod +x  /usr/libexec/rpm-file-permissions
 RUN /usr/libexec/container-setup && rpm-file-permissions
 
 USER 1001
